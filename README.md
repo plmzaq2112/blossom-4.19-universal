@@ -31,6 +31,8 @@ Devices (by codename): `dandelion`, `angelica`, `angelican`, `angelicain`,
 The DTB produced by this tree can crash LK on real hardware. The build and
 release packages therefore use the known-good 1020 base DTB
 (`126,985 bytes`, `sha256 333cf70ce8cf6da0dd4c3326ed7dfc4965209cce02651ad164ed749ff0211732`).
+A copy is kept in `build-tools/refs/1020boot.dtb`; `build_sashimi.sh` falls back
+to it when the external reference is missing.
 Do not package a freshly built `mt6765.dtb` into a boot image.
 
 ## Building
@@ -42,7 +44,12 @@ Do not package a freshly built `mt6765.dtb` into a boot image.
 - `run_build.sh` — logging wrapper
 - `pack_boot.py` — repack an Android boot v2 image with a new kernel/DTB
 - `append_cmdline.py` / `edit_cmdline.py` — boot cmdline helpers
-- `patches/` — all changes on top of the upstream sashimi branch
+- `refparse.py` — Android boot image parser used to compare reference images
+- `control_build.sh` — experimental control build (fixed base commit)
+- `pack_oc.py` — legacy early boot repacker (superseded by `pack_boot.py`)
+- `patches/` — complete patch series (22 patches) on top of the upstream
+  `sashimi` branch
+- `refs/1020boot.dtb` — known-good base DTB used for the release
 
 Requirements: clang (Neutron clang 24), GNU aarch64 cross binutils,
 ccache, bc, flex, zip, dtc.

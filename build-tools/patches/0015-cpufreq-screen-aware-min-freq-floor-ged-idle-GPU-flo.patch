@@ -1,0 +1,210 @@
+From ff8d78a6561f9484de024038295ddb90ace0532f Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 14:06:06 +0800
+Subject: [PATCH 15/22] cpufreq: screen-aware min freq floor; ged: idle GPU
+ floor back to 550MHz
+
+---
+ drivers/gpu/mediatek/ged/src/ged_dvfs.c       |  5 +-
+ .../cpufreq_v1/inc/mtk_cpufreq_internal.h     |  3 +
+ .../power/cpufreq_v1/src/mtk_cpufreq_hybrid.c | 21 +++--
+ .../power/cpufreq_v1/src/mtk_cpufreq_main.c   | 88 ++++++++++++++-----
+ 4 files changed, 82 insertions(+), 35 deletions(-)
+
+diff --git a/drivers/gpu/mediatek/ged/src/ged_dvfs.c b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+index 43570c13e..8dee95536 100644
+--- a/drivers/gpu/mediatek/ged/src/ged_dvfs.c
++++ b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+@@ -1500,9 +1500,6 @@ static void ged_dvfs_set_bottom_gpu_freq(unsigned int ui32FreqLevel)
+ 	/* 0 => The highest frequency */
+ 	/* table_num - 1 => The lowest frequency */
+ 	s_bottom_freq_id = ui32MaxLevel - ui32FreqLevel;
+-	/* never let userspace (libged) lower the floor below 690MHz */
+-	if (ui32MaxLevel >= 1 && s_bottom_freq_id > ui32MaxLevel - 1)
+-		s_bottom_freq_id = ui32MaxLevel - 1;
+ 	gpu_bottom_freq = mt_gpufreq_get_freq_by_idx(s_bottom_freq_id);
+ 	if (g_bottom_freq_id < s_bottom_freq_id) {
+ 		g_bottom_freq_id = s_bottom_freq_id;
+@@ -2136,7 +2133,7 @@ GED_ERROR ged_dvfs_system_init(void)
+ 
+ 	g_dvfs_skip_round = 0;
+ 
+-	g_bottom_freq_id = mt_gpufreq_get_dvfs_table_num() - 2;
++	g_bottom_freq_id = mt_gpufreq_get_dvfs_table_num() - 1;
+ 	gpu_bottom_freq = mt_gpufreq_get_freq_by_idx(g_bottom_freq_id);
+ 
+ 	g_cust_boost_freq_id = mt_gpufreq_get_dvfs_table_num() - 1;
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/inc/mtk_cpufreq_internal.h b/drivers/misc/mediatek/base/power/cpufreq_v1/inc/mtk_cpufreq_internal.h
+index 44d55c987..92c2fddda 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/inc/mtk_cpufreq_internal.h
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/inc/mtk_cpufreq_internal.h
+@@ -317,4 +317,7 @@ extern u8 aee_rr_curr_cpu_dvfs_step(void);
+ extern u8 aee_rr_curr_cpu_dvfs_cb(void);
+ extern u8 aee_rr_curr_cpufreq_cb(void);
+ 
++extern bool mt_cpufreq_screen_on;
++extern unsigned int mt_cpufreq_min_floor(enum mt_cpu_dvfs_id id);
++
+ #endif	/* __MTK_CPUFREQ_INTERNAL_H__ */
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c
+index ad8845460..9cc5019f1 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c
+@@ -282,13 +282,20 @@ int Ripi_cpu_dvfs_thread(void *data)
+ 				);
+ #endif
+ 
+-				/* keep the cluster floor: hybrid rewrites min periodically */
+-				if (cid == 0 && p->mt_policy->min < 800000)
+-					p->mt_policy->min = 800000;
+-				else if (cid == 1 && p->mt_policy->min < 600000)
+-					p->mt_policy->min = 600000;
+-				if (p->mt_policy->min > p->mt_policy->max)
+-					p->mt_policy->min = p->mt_policy->max;
++				{
++					enum mt_cpu_dvfs_id __c =
++						(cid == 0) ? MT_CPU_DVFS_L :
++						(cid == 1) ? MT_CPU_DVFS_LL :
++						MT_CPU_DVFS_CCI;
++					unsigned int __f =
++						mt_cpufreq_min_floor(__c);
++
++					if (__f && p->mt_policy->min < __f)
++						p->mt_policy->min = __f;
++					if (p->mt_policy->min > p->mt_policy->max)
++						p->mt_policy->min =
++							p->mt_policy->max;
++				}
+ 
+ #ifdef MET_DRV
+ 				if (cid == 0) {
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index 174f04963..81db57ee6 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -6,6 +6,8 @@
+ #include <linux/random.h>
+ #include <linux/pm_opp.h>
+ #include <linux/energy_model.h>
++#include <linux/fb.h>
++#include <linux/workqueue.h>
+ //#include <mt-plat/met_drv.h>
+ /* project includes */
+ #include "../../include/mtk_ppm_api.h"
+@@ -866,6 +868,50 @@ static void _mt_cpufreq_set(struct cpufreq_policy *policy,
+ /* one action could be combinational set */
+ static enum mt_cpu_dvfs_id _get_cpu_dvfs_id(unsigned int cpu_id);
+ 
++/* ---- screen-state aware minimum frequency floor ---- */
++bool mt_cpufreq_screen_on = true;
++
++unsigned int mt_cpufreq_min_floor(enum mt_cpu_dvfs_id id)
++{
++	if (id == MT_CPU_DVFS_L)
++		return mt_cpufreq_screen_on ? 800000 : 400000;
++	if (id == MT_CPU_DVFS_LL)
++		return mt_cpufreq_screen_on ? 600000 : 300000;
++	return 0;
++}
++
++static void mt_cpufreq_screen_work(struct work_struct *work)
++{
++	cpufreq_update_policy(0);
++	cpufreq_update_policy(4);
++}
++static DECLARE_WORK(mt_cpufreq_screen_workq, mt_cpufreq_screen_work);
++
++static int mt_cpufreq_fb_notifier(struct notifier_block *nb,
++				  unsigned long event, void *data)
++{
++	struct fb_event *evdata = data;
++	int blank;
++
++	if (event != FB_EVENT_BLANK || !evdata || !evdata->data)
++		return NOTIFY_DONE;
++
++	blank = *(int *)evdata->data;
++	mt_cpufreq_screen_on = (blank == FB_BLANK_UNBLANK);
++	schedule_work(&mt_cpufreq_screen_workq);
++	return NOTIFY_OK;
++}
++
++static struct notifier_block mt_cpufreq_fb_nb = {
++	.notifier_call = mt_cpufreq_fb_notifier,
++};
++
++static int __init mt_cpufreq_screen_notifier_init(void)
++{
++	return fb_register_client(&mt_cpufreq_fb_nb);
++}
++late_initcall(mt_cpufreq_screen_notifier_init);
++
+ void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_idx,
+ 	enum mt_cpu_dvfs_action_id action, void *data)
+ {
+@@ -911,15 +957,16 @@ void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_idx,
+ 					cpu_dvfs_get_freq_by_idx(pp,
+ 					pp->idx_opp_ppm_base);
+ 
+-				/* keep the cluster floor (PPM writes bypass verify) */
+-				if (_get_cpu_dvfs_id(pp->cpu_id) == MT_CPU_DVFS_L &&
+-					pp->mt_policy->min < 800000)
+-					pp->mt_policy->min = 800000;
+-				else if (_get_cpu_dvfs_id(pp->cpu_id) == MT_CPU_DVFS_LL &&
+-					pp->mt_policy->min < 600000)
+-					pp->mt_policy->min = 600000;
+-				if (pp->mt_policy->min > pp->mt_policy->max)
+-					pp->mt_policy->min = pp->mt_policy->max;
++				{
++					unsigned int __f = mt_cpufreq_min_floor(
++						_get_cpu_dvfs_id(pp->cpu_id));
++
++					if (__f && pp->mt_policy->min < __f)
++						pp->mt_policy->min = __f;
++					if (pp->mt_policy->min > pp->mt_policy->max)
++						pp->mt_policy->min =
++							pp->mt_policy->max;
++				}
+ 
+ 				ignore_ppm = 0;
+ 				if ((pp->idx_opp_tbl >= pp->mt_policy->max) &&
+@@ -1174,16 +1221,8 @@ static int _mt_cpufreq_verify(struct cpufreq_policy *policy)
+ 
+ 	ret = cpufreq_frequency_table_verify(policy, p->freq_tbl_for_cpufreq);
+ 
+-	/*
+-	 * Keep a sane floor so userspace cannot park a cluster at a
+-	 * latency-hostile frequency.  Modest raise only:
+-	 *   L   (big)    400MHz -> 800MHz
+-	 *   LL  (little) 300MHz -> 600MHz
+-	 */
+-	if (id == MT_CPU_DVFS_L)
+-		floor_khz = 800000;
+-	else if (id == MT_CPU_DVFS_LL)
+-		floor_khz = 600000;
++	/* screen-aware floor: 800/600 on, 400/300 off */
++	floor_khz = mt_cpufreq_min_floor(id);
+ 
+ 	if (floor_khz && policy->min < floor_khz) {
+ 		policy->min = floor_khz;
+@@ -1334,11 +1373,12 @@ static int _mt_cpufreq_init(struct cpufreq_policy *policy)
+ 				p->idx_opp_ppm_limit);
+ 		policy->min = cpu_dvfs_get_freq_by_idx(p,
+ 				p->idx_opp_ppm_base);
+-		/* modest cluster floor: big 800MHz, little 600MHz */
+-		if (id == MT_CPU_DVFS_L && policy->min < 800000)
+-			policy->min = 800000;
+-		else if (id == MT_CPU_DVFS_LL && policy->min < 600000)
+-			policy->min = 600000;
++		{
++			unsigned int __f = mt_cpufreq_min_floor(id);
++
++			if (__f && policy->min < __f)
++				policy->min = __f;
++		}
+ 		p->mt_policy = policy;
+ 		p->armpll_is_available = 1;
+ 
+-- 
+2.53.0
+

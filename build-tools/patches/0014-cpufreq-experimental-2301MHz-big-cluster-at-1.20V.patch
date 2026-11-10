@@ -1,0 +1,75 @@
+From 69ac5ecf63e33e655276a1264efba83619f70c42 Mon Sep 17 00:00:00 2001
+From: exp <exp@local>
+Date: Tue, 10 Nov 2026 13:54:20 +0800
+Subject: [PATCH 14/22] cpufreq: experimental 2301MHz big cluster at 1.20V
+
+---
+ .../cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h | 4 ++--
+ .../cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h    | 8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h
+index 7478544d9..10c5887ad 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h
+@@ -226,7 +226,7 @@ static unsigned int c65Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 
+ static unsigned int c62Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	/* Freq, Vproc, post_div, clk_div */
+-	{ 2201, 120, 1, 1 },	/* L */
++	{ 2301, 125, 1, 1 },	/* L */
+ 	{ 1961, 88, 1, 1 },
+ 	{ 1927, 81, 1, 1 },
+ 	{ 1897, 75, 1, 1 },
+@@ -280,7 +280,7 @@ static unsigned int c62Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 
+ static unsigned int c62lyTbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	/* Freq, Vproc, post_div, clk_div */
+-	{ 2201, 120, 1, 1 },	/* L */
++	{ 2301, 125, 1, 1 },	/* L */
+ 	{ 1961, 90, 1, 1 },
+ 	{ 1927, 84, 1, 1 },
+ 	{ 1897, 79, 1, 1 },
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
+index 0af181930..069a3994b 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
+@@ -436,7 +436,7 @@
+ 
+ /* C62 */
+ /* for DVFS OPP table L */
+-#define CPU_DVFS_FREQ0_L_C62    2201000    /* KHz */
++#define CPU_DVFS_FREQ0_L_C62    2301000    /* KHz */
+ #define CPU_DVFS_FREQ1_L_C62    1961000    /* KHz */
+ #define CPU_DVFS_FREQ2_L_C62    1927000    /* KHz */
+ #define CPU_DVFS_FREQ3_L_C62    1897000    /* KHz */
+@@ -490,7 +490,7 @@
+ #define CPU_DVFS_FREQ15_CCI_C62    150000    /* KHz */
+ 
+ /* for DVFS OPP table */
+-#define CPU_DVFS_VOLT0_VPROC_L_C62    116875          /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_L_C62    120000          /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_L_C62    102500          /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_L_C62    102500          /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_L_C62     98750          /* 10uV */
+@@ -543,7 +543,7 @@
+ 
+ /* C62LY */
+ /* for DVFS OPP table L */
+-#define CPU_DVFS_FREQ0_L_C62LY    2201000    /* KHz */
++#define CPU_DVFS_FREQ0_L_C62LY    2301000    /* KHz */
+ #define CPU_DVFS_FREQ1_L_C62LY    1961000    /* KHz */
+ #define CPU_DVFS_FREQ2_L_C62LY    1927000    /* KHz */
+ #define CPU_DVFS_FREQ3_L_C62LY    1897000    /* KHz */
+@@ -597,7 +597,7 @@
+ #define CPU_DVFS_FREQ15_CCI_C62LY    300000    /* KHz */
+ 
+ /* for DVFS OPP table */
+-#define CPU_DVFS_VOLT0_VPROC_L_C62LY    116875           /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_L_C62LY    120000           /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_L_C62LY    108125           /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_L_C62LY    104375           /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_L_C62LY    101250           /* 10uV */
+-- 
+2.53.0
+

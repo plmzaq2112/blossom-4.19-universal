@@ -1,0 +1,26 @@
+From 2dfb02f7919d341b0f6d66f108eaef0a11c6e9ae Mon Sep 17 00:00:00 2001
+From: gpu-boost <gpu-boost@local>
+Date: Tue, 10 Nov 2026 12:10:36 +0800
+Subject: [PATCH 03/22] ged: enable userspace GPU boost path by default
+ (boost_gpu_enable=1)
+
+---
+ drivers/gpu/mediatek/ged/src/ged_dvfs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/mediatek/ged/src/ged_dvfs.c b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+index 9e057b64c..44a594441 100644
+--- a/drivers/gpu/mediatek/ged/src/ged_dvfs.c
++++ b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+@@ -63,7 +63,7 @@ enum MTK_GPU_DVFS_TYPE g_CommitType;
+ unsigned long g_ulCommitFreq;
+ 
+ #ifdef ENABLE_COMMON_DVFS
+-static unsigned int boost_gpu_enable;
++static unsigned int boost_gpu_enable = 1;
+ static unsigned int gpu_bottom_freq;
+ static unsigned int gpu_cust_boost_freq;
+ static unsigned int gpu_cust_upbound_freq;
+-- 
+2.53.0
+

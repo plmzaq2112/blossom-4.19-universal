@@ -1,0 +1,28 @@
+From bdbe3136b4d24be465a5966625569511a525194a Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 13:07:34 +0800
+Subject: [PATCH 08/22] cpufreq: apply min-freq floor in driver init too
+
+---
+ .../mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c    | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index 742975ed9..c8f3728d5 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -1322,6 +1322,11 @@ static int _mt_cpufreq_init(struct cpufreq_policy *policy)
+ 				p->idx_opp_ppm_limit);
+ 		policy->min = cpu_dvfs_get_freq_by_idx(p,
+ 				p->idx_opp_ppm_base);
++		/* modest cluster floor: big 800MHz, little 600MHz */
++		if (id == MT_CPU_DVFS_L && policy->min < 800000)
++			policy->min = 800000;
++		else if (id == MT_CPU_DVFS_LL && policy->min < 600000)
++			policy->min = 600000;
+ 		p->mt_policy = policy;
+ 		p->armpll_is_available = 1;
+ 
+-- 
+2.53.0
+

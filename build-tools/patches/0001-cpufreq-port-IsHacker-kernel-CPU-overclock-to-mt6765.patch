@@ -1,0 +1,294 @@
+From a54d6b2fc60b5e365b1ebb08b4be776474cc43a3 Mon Sep 17 00:00:00 2001
+From: oc-port <oc-port@local>
+Date: Tue, 10 Nov 2026 10:17:52 +0800
+Subject: [PATCH 01/22] cpufreq: port IsHacker-kernel CPU overclock to mt6765
+ C62/C62LY
+
+---
+ arch/arm64/boot/dts/mediatek/mt6765.dts       | 28 +++++++++----------
+ .../mach/mt6765/mtk_cpufreq_opp_pv_table.h    | 12 ++++----
+ .../src/mach/mt6765/mtk_cpufreq_opp_table.h   | 24 ++++++++--------
+ 3 files changed, 32 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dts b/arch/arm64/boot/dts/mediatek/mt6765.dts
+index c9bbfe445..71f4d5d22 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6765.dts
+@@ -108,8 +108,8 @@ firmware_class.path=/vendor/firmware";
+ 			opp-microvolt = <1025000>;
+ 		};
+ 		opp15 {
+-			opp-hz = /bits/ 64 <2401000000>;
+-			opp-microvolt = <1068750>;
++			opp-hz = /bits/ 64 <2501000000>;
++			opp-microvolt = <1168750>;
+ 		};
+ 	};
+ 
+@@ -177,8 +177,8 @@ firmware_class.path=/vendor/firmware";
+ 			opp-microvolt = <987500>;
+ 		};
+ 		opp15 {
+-			opp-hz = /bits/ 64 <1800000000>;
+-			opp-microvolt = <1025000>;
++			opp-hz = /bits/ 64 <2000000000>;
++			opp-microvolt = <1168750>;
+ 		};
+ 	};
+ 
+@@ -246,8 +246,8 @@ firmware_class.path=/vendor/firmware";
+ 			opp-microvolt = <1025000>;
+ 		};
+ 		opp15 {
+-			opp-hz = /bits/ 64 <1051000000>;
+-			opp-microvolt = <1068750>;
++			opp-hz = /bits/ 64 <1251000000>;
++			opp-microvolt = <1168750>;
+ 		};
+ 	};
+ 
+@@ -268,7 +268,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x000>;
+ 			enable-method = "psci";
+-			clock-frequency = <2401000000>;
++			clock-frequency = <2501000000>;
+ 			operating-points-v2 = <&cluster0_opp>;
+ 			dynamic-power-coefficient = <275>;
+ 			capacity-dmips-mhz = <1024>;
+@@ -281,7 +281,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x001>;
+ 			enable-method = "psci";
+-			clock-frequency = <2401000000>;
++			clock-frequency = <2501000000>;
+ 			operating-points-v2 = <&cluster0_opp>;
+ 			dynamic-power-coefficient = <275>;
+ 			capacity-dmips-mhz = <1024>;
+@@ -294,7 +294,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x002>;
+ 			enable-method = "psci";
+-			clock-frequency = <2401000000>;
++			clock-frequency = <2501000000>;
+ 			operating-points-v2 = <&cluster0_opp>;
+ 			dynamic-power-coefficient = <275>;
+ 			capacity-dmips-mhz = <1024>;
+@@ -307,7 +307,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x003>;
+ 			enable-method = "psci";
+-			clock-frequency = <2401000000>;
++			clock-frequency = <2501000000>;
+ 			operating-points-v2 = <&cluster0_opp>;
+ 			dynamic-power-coefficient = <275>;
+ 			capacity-dmips-mhz = <1024>;
+@@ -320,7 +320,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+-			clock-frequency = <1800000000>;
++			clock-frequency = <2000000000>;
+ 			operating-points-v2 = <&cluster1_opp>;
+ 			dynamic-power-coefficient = <85>;
+ 			capacity-dmips-mhz = <801>;
+@@ -333,7 +333,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x101>;
+ 			enable-method = "psci";
+-			clock-frequency = <1800000000>;
++			clock-frequency = <2000000000>;
+ 			operating-points-v2 = <&cluster1_opp>;
+ 			dynamic-power-coefficient = <85>;
+ 			capacity-dmips-mhz = <801>;
+@@ -346,7 +346,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x102>;
+ 			enable-method = "psci";
+-			clock-frequency = <1800000000>;
++			clock-frequency = <2000000000>;
+ 			operating-points-v2 = <&cluster1_opp>;
+ 			dynamic-power-coefficient = <85>;
+ 			capacity-dmips-mhz = <801>;
+@@ -359,7 +359,7 @@ firmware_class.path=/vendor/firmware";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x103>;
+ 			enable-method = "psci";
+-			clock-frequency = <1800000000>;
++			clock-frequency = <2000000000>;
+ 			operating-points-v2 = <&cluster1_opp>;
+ 			dynamic-power-coefficient = <85>;
+ 			capacity-dmips-mhz = <801>;
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h
+index bef7bc74f..7478544d9 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h
+@@ -226,7 +226,7 @@ static unsigned int c65Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 
+ static unsigned int c62Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	/* Freq, Vproc, post_div, clk_div */
+-	{ 2101, 96, 1, 1 },	/* L */
++	{ 2201, 120, 1, 1 },	/* L */
+ 	{ 1961, 88, 1, 1 },
+ 	{ 1927, 81, 1, 1 },
+ 	{ 1897, 75, 1, 1 },
+@@ -243,7 +243,7 @@ static unsigned int c62Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	{  979, 16, 2, 1 },
+ 	{  400, 13, 2, 1 },
+ 
+-	{ 1500, 96, 2, 1 },	/* LL */
++	{ 1700, 120, 2, 1 },	/* LL */
+ 	{ 1429, 88, 2, 1 },
+ 	{ 1367, 81, 2, 1 },
+ 	{ 1314, 75, 2, 1 },
+@@ -260,7 +260,7 @@ static unsigned int c62Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	{  501, 18, 4, 1 },
+ 	{  300, 13, 4, 2 },
+ 
+-	{ 1048, 96, 2, 1 },	/* CCI */
++	{ 1248, 120, 2, 1 },	/* CCI */
+ 	{  997, 88, 2, 1 },
+ 	{  953, 81, 2, 1 },
+ 	{  915, 75, 2, 1 },
+@@ -280,7 +280,7 @@ static unsigned int c62Tbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 
+ static unsigned int c62lyTbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	/* Freq, Vproc, post_div, clk_div */
+-	{ 2101, 96, 1, 1 },	/* L */
++	{ 2201, 120, 1, 1 },	/* L */
+ 	{ 1961, 90, 1, 1 },
+ 	{ 1927, 84, 1, 1 },
+ 	{ 1897, 79, 1, 1 },
+@@ -297,7 +297,7 @@ static unsigned int c62lyTbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	{  979, 17, 2, 1 },
+ 	{  400, 13, 2, 1 },
+ 
+-	{ 1500, 96, 2, 1 },	/* LL */
++	{ 1700, 120, 2, 1 },	/* LL */
+ 	{ 1429, 90, 2, 1 },
+ 	{ 1367, 84, 2, 1 },
+ 	{ 1314, 79, 2, 1 },
+@@ -314,7 +314,7 @@ static unsigned int c62lyTbl[NR_FREQ * NR_MT_CPU_DVFS][ARRAY_COL_SIZE] = {
+ 	{  501, 20, 4, 1 },
+ 	{  300, 13, 4, 2 },
+ 
+-	{ 1048, 96, 2, 1 },	/* CCI */
++	{ 1248, 120, 2, 1 },	/* CCI */
+ 	{  997, 90, 2, 1 },
+ 	{  953, 84, 2, 1 },
+ 	{  915, 79, 2, 1 },
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
+index a04325a69..0af181930 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h
+@@ -436,7 +436,7 @@
+ 
+ /* C62 */
+ /* for DVFS OPP table L */
+-#define CPU_DVFS_FREQ0_L_C62    2101000    /* KHz */
++#define CPU_DVFS_FREQ0_L_C62    2201000    /* KHz */
+ #define CPU_DVFS_FREQ1_L_C62    1961000    /* KHz */
+ #define CPU_DVFS_FREQ2_L_C62    1927000    /* KHz */
+ #define CPU_DVFS_FREQ3_L_C62    1897000    /* KHz */
+@@ -454,7 +454,7 @@
+ #define CPU_DVFS_FREQ15_L_C62    400000    /* KHz */
+ 
+ /* for DVFS OPP table LL */
+-#define CPU_DVFS_FREQ0_LL_C62    1500000    /* KHz */
++#define CPU_DVFS_FREQ0_LL_C62    1700000    /* KHz */
+ #define CPU_DVFS_FREQ1_LL_C62    1429000    /* KHz */
+ #define CPU_DVFS_FREQ2_LL_C62    1367000    /* KHz */
+ #define CPU_DVFS_FREQ3_LL_C62    1314000    /* KHz */
+@@ -472,7 +472,7 @@
+ #define CPU_DVFS_FREQ15_LL_C62    300000    /* KHz */
+ 
+ /* for DVFS OPP table CCI */
+-#define CPU_DVFS_FREQ0_CCI_C62    1048000    /* KHz */
++#define CPU_DVFS_FREQ0_CCI_C62    1248000    /* KHz */
+ #define CPU_DVFS_FREQ1_CCI_C62     997000    /* KHz */
+ #define CPU_DVFS_FREQ2_CCI_C62     953000    /* KHz */
+ #define CPU_DVFS_FREQ3_CCI_C62     915000    /* KHz */
+@@ -490,7 +490,7 @@
+ #define CPU_DVFS_FREQ15_CCI_C62    150000    /* KHz */
+ 
+ /* for DVFS OPP table */
+-#define CPU_DVFS_VOLT0_VPROC_L_C62    106875          /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_L_C62    116875          /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_L_C62    102500          /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_L_C62    102500          /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_L_C62     98750          /* 10uV */
+@@ -507,7 +507,7 @@
+ #define CPU_DVFS_VOLT14_VPROC_L_C62    61875          /* 10uV */
+ #define CPU_DVFS_VOLT15_VPROC_L_C62    50000          /* 10uV */
+ 
+-#define CPU_DVFS_VOLT0_VPROC_LL_C62    102500          /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_LL_C62    116875          /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_LL_C62     98750          /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_LL_C62     98750          /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_LL_C62     98750          /* 10uV */
+@@ -524,7 +524,7 @@
+ #define CPU_DVFS_VOLT14_VPROC_LL_C62    60000          /* 10uV */
+ #define CPU_DVFS_VOLT15_VPROC_LL_C62    50000          /* 10uV */
+ 
+-#define CPU_DVFS_VOLT0_VPROC_CCI_C62    106875          /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_CCI_C62    116875          /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_CCI_C62    102500          /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_CCI_C62    102500          /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_CCI_C62     98750          /* 10uV */
+@@ -543,7 +543,7 @@
+ 
+ /* C62LY */
+ /* for DVFS OPP table L */
+-#define CPU_DVFS_FREQ0_L_C62LY    2101000    /* KHz */
++#define CPU_DVFS_FREQ0_L_C62LY    2201000    /* KHz */
+ #define CPU_DVFS_FREQ1_L_C62LY    1961000    /* KHz */
+ #define CPU_DVFS_FREQ2_L_C62LY    1927000    /* KHz */
+ #define CPU_DVFS_FREQ3_L_C62LY    1897000    /* KHz */
+@@ -561,7 +561,7 @@
+ #define CPU_DVFS_FREQ15_L_C62LY    900000    /* KHz */
+ 
+ /* for DVFS OPP table LL */
+-#define CPU_DVFS_FREQ0_LL_C62LY    1500000    /* KHz */
++#define CPU_DVFS_FREQ0_LL_C62LY    1700000    /* KHz */
+ #define CPU_DVFS_FREQ1_LL_C62LY    1429000    /* KHz */
+ #define CPU_DVFS_FREQ2_LL_C62LY    1367000    /* KHz */
+ #define CPU_DVFS_FREQ3_LL_C62LY    1314000    /* KHz */
+@@ -579,7 +579,7 @@
+ #define CPU_DVFS_FREQ15_LL_C62LY    400000    /* KHz */
+ 
+ /* for DVFS OPP table CCI */
+-#define CPU_DVFS_FREQ0_CCI_C62LY    1048000    /* KHz */
++#define CPU_DVFS_FREQ0_CCI_C62LY    1248000    /* KHz */
+ #define CPU_DVFS_FREQ1_CCI_C62LY     997000    /* KHz */
+ #define CPU_DVFS_FREQ2_CCI_C62LY     953000    /* KHz */
+ #define CPU_DVFS_FREQ3_CCI_C62LY     915000    /* KHz */
+@@ -597,7 +597,7 @@
+ #define CPU_DVFS_FREQ15_CCI_C62LY    300000    /* KHz */
+ 
+ /* for DVFS OPP table */
+-#define CPU_DVFS_VOLT0_VPROC_L_C62LY    111875           /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_L_C62LY    116875           /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_L_C62LY    108125           /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_L_C62LY    104375           /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_L_C62LY    101250           /* 10uV */
+@@ -614,7 +614,7 @@
+ #define CPU_DVFS_VOLT14_VPROC_L_C62LY    62500           /* 10uV */
+ #define CPU_DVFS_VOLT15_VPROC_L_C62LY    60000           /* 10uV */
+ 
+-#define CPU_DVFS_VOLT0_VPROC_LL_C62LY    111875           /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_LL_C62LY    116875           /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_LL_C62LY    108125           /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_LL_C62LY    104375           /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_LL_C62LY    101250           /* 10uV */
+@@ -631,7 +631,7 @@
+ #define CPU_DVFS_VOLT14_VPROC_LL_C62LY    64375           /* 10uV */
+ #define CPU_DVFS_VOLT15_VPROC_LL_C62LY    60000           /* 10uV */
+ 
+-#define CPU_DVFS_VOLT0_VPROC_CCI_C62LY    111875           /* 10uV */
++#define CPU_DVFS_VOLT0_VPROC_CCI_C62LY    116875           /* 10uV */
+ #define CPU_DVFS_VOLT1_VPROC_CCI_C62LY    108125           /* 10uV */
+ #define CPU_DVFS_VOLT2_VPROC_CCI_C62LY    104375           /* 10uV */
+ #define CPU_DVFS_VOLT3_VPROC_CCI_C62LY    101250           /* 10uV */
+-- 
+2.53.0
+

@@ -1,0 +1,68 @@
+From b28b050ccd783a68ab1994b0020ab9edd809d4da Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 12:59:47 +0800
+Subject: [PATCH 07/22] arm64: config: enable PSI; cpufreq: raise cluster min
+ freq floor (big 800MHz, little 600MHz)
+
+---
+ arch/arm64/configs/blossom_defconfig          |  1 +
+ .../power/cpufreq_v1/src/mtk_cpufreq_main.c   | 24 ++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/blossom_defconfig b/arch/arm64/configs/blossom_defconfig
+index 42bc1313e..1a38d82d7 100644
+--- a/arch/arm64/configs/blossom_defconfig
++++ b/arch/arm64/configs/blossom_defconfig
+@@ -121,6 +121,7 @@ CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y
+ # CONFIG_FW_CACHE is not set
+ # CONFIG_ALLOW_DEV_COREDUMP is not set
+ CONFIG_ZRAM=y
++CONFIG_PSI=y
+ CONFIG_ZRAM_WRITEBACK=y
+ CONFIG_ZRAM_DEF_COMP_LZ4=y
+ CONFIG_ZRAM_MULTI_COMP=y
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index 2384ed4a4..742975ed9 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -1151,14 +1151,36 @@ static void ppm_limit_callback(struct ppm_client_req req)
+ static int _mt_cpufreq_verify(struct cpufreq_policy *policy)
+ {
+ 	struct mt_cpu_dvfs *p;
++	enum mt_cpu_dvfs_id id;
++	unsigned int floor_khz = 0;
+ 	int ret; /* cpufreq_frequency_table_verify() always return 0 */
+ 
+-	p = id_to_cpu_dvfs(_get_cpu_dvfs_id(policy->cpu));
++	id = _get_cpu_dvfs_id(policy->cpu);
++	p = id_to_cpu_dvfs(id);
+ 	if (!p)
+ 		return -EINVAL;
+ 
+ 	ret = cpufreq_frequency_table_verify(policy, p->freq_tbl_for_cpufreq);
+ 
++	/*
++	 * Keep a sane floor so userspace cannot park a cluster at a
++	 * latency-hostile frequency.  Modest raise only:
++	 *   L   (big)    400MHz -> 800MHz
++	 *   LL  (little) 300MHz -> 600MHz
++	 */
++	if (id == MT_CPU_DVFS_L)
++		floor_khz = 800000;
++	else if (id == MT_CPU_DVFS_LL)
++		floor_khz = 600000;
++
++	if (floor_khz && policy->min < floor_khz) {
++		policy->min = floor_khz;
++		if (policy->max < policy->min)
++			policy->max = policy->min;
++		ret = cpufreq_frequency_table_verify(policy,
++						p->freq_tbl_for_cpufreq);
++	}
++
+ 	return ret;
+ }
+ 
+-- 
+2.53.0
+

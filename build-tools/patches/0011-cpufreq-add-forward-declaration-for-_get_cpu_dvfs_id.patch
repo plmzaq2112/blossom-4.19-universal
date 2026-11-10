@@ -1,0 +1,25 @@
+From cba9d7be7264e2e75141c4017a47e6b5a804fe9d Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 13:15:17 +0800
+Subject: [PATCH 11/22] cpufreq: add forward declaration for _get_cpu_dvfs_id
+
+---
+ .../misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c  | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index bd2e23bda..174f04963 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -864,6 +864,8 @@ static void _mt_cpufreq_set(struct cpufreq_policy *policy,
+ }
+ 
+ /* one action could be combinational set */
++static enum mt_cpu_dvfs_id _get_cpu_dvfs_id(unsigned int cpu_id);
++
+ void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_idx,
+ 	enum mt_cpu_dvfs_action_id action, void *data)
+ {
+-- 
+2.53.0
+

@@ -1,0 +1,33 @@
+From f3a32eff2eea9580477ae759710461933a3fc09d Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 13:13:25 +0800
+Subject: [PATCH 09/22] cpufreq: clamp min freq in PPM direct-write path
+
+---
+ .../base/power/cpufreq_v1/src/mtk_cpufreq_main.c       | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index c8f3728d5..46f340f47 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -909,6 +909,16 @@ void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_idx,
+ 					cpu_dvfs_get_freq_by_idx(pp,
+ 					pp->idx_opp_ppm_base);
+ 
++				/* keep the cluster floor (PPM writes bypass verify) */
++				if (pp->cpu_id == MT_CPU_DVFS_L &&
++					pp->mt_policy->min < 800000)
++					pp->mt_policy->min = 800000;
++				else if (pp->cpu_id == MT_CPU_DVFS_LL &&
++					pp->mt_policy->min < 600000)
++					pp->mt_policy->min = 600000;
++				if (pp->mt_policy->min > pp->mt_policy->max)
++					pp->mt_policy->min = pp->mt_policy->max;
++
+ 				ignore_ppm = 0;
+ 				if ((pp->idx_opp_tbl >= pp->mt_policy->max) &&
+ 				(pp->idx_opp_tbl <= pp->mt_policy->min)) {
+-- 
+2.53.0
+

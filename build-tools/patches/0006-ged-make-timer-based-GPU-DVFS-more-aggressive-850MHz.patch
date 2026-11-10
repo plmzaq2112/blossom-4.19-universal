@@ -1,0 +1,35 @@
+From 16e10d3816297b2e9c0b442e6554978bb720ad22 Mon Sep 17 00:00:00 2001
+From: gpu-boost <gpu-boost@local>
+Date: Tue, 10 Nov 2026 12:46:45 +0800
+Subject: [PATCH 06/22] ged: make timer-based GPU DVFS more aggressive (850MHz
+ from ~45% load)
+
+---
+ drivers/gpu/mediatek/ged/src/ged_dvfs.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/mediatek/ged/src/ged_dvfs.c b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+index 095b0b75c..43570c13e 100644
+--- a/drivers/gpu/mediatek/ged/src/ged_dvfs.c
++++ b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+@@ -1260,13 +1260,13 @@ static bool ged_dvfs_policy(
+ 			i32NewFreqID = 0;
+ 		else if (ui32GPULoading <= 1)
+ 			i32NewFreqID = i32MaxLevel;
+-		else if (ui32GPULoading >= 85)
++		else if (ui32GPULoading >= 70)
+ 			i32NewFreqID -= 2;
+-		else if (ui32GPULoading <= 30)
++		else if (ui32GPULoading <= 20)
+ 			i32NewFreqID += 2;
+-		else if (ui32GPULoading >= 70)
++		else if (ui32GPULoading >= 45)
+ 			i32NewFreqID -= 1;
+-		else if (ui32GPULoading <= 50)
++		else if (ui32GPULoading <= 35)
+ 			i32NewFreqID += 1;
+ 
+ 		if (i32NewFreqID < ui32GPUFreq) {
+-- 
+2.53.0
+

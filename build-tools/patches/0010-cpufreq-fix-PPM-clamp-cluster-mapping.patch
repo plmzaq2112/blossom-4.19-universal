@@ -1,0 +1,29 @@
+From 987dcbb0b7ce966fbcc60564489eef408d15c792 Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 13:13:59 +0800
+Subject: [PATCH 10/22] cpufreq: fix PPM clamp cluster mapping
+
+---
+ .../mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c     | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index 46f340f47..bd2e23bda 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -910,10 +910,10 @@ void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_idx,
+ 					pp->idx_opp_ppm_base);
+ 
+ 				/* keep the cluster floor (PPM writes bypass verify) */
+-				if (pp->cpu_id == MT_CPU_DVFS_L &&
++				if (_get_cpu_dvfs_id(pp->cpu_id) == MT_CPU_DVFS_L &&
+ 					pp->mt_policy->min < 800000)
+ 					pp->mt_policy->min = 800000;
+-				else if (pp->cpu_id == MT_CPU_DVFS_LL &&
++				else if (_get_cpu_dvfs_id(pp->cpu_id) == MT_CPU_DVFS_LL &&
+ 					pp->mt_policy->min < 600000)
+ 					pp->mt_policy->min = 600000;
+ 				if (pp->mt_policy->min > pp->mt_policy->max)
+-- 
+2.53.0
+

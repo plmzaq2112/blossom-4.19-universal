@@ -1,0 +1,26 @@
+From 3377fcb6bced0a99583e2306bf1933bb93e2fb55 Mon Sep 17 00:00:00 2001
+From: gpu-boost <gpu-boost@local>
+Date: Tue, 10 Nov 2026 12:18:37 +0800
+Subject: [PATCH 04/22] ged: raise GPU DVFS floor to 690MHz (drop the 550MHz
+ bucket)
+
+---
+ drivers/gpu/mediatek/ged/src/ged_dvfs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/mediatek/ged/src/ged_dvfs.c b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+index 44a594441..fe29596ca 100644
+--- a/drivers/gpu/mediatek/ged/src/ged_dvfs.c
++++ b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+@@ -2133,7 +2133,7 @@ GED_ERROR ged_dvfs_system_init(void)
+ 
+ 	g_dvfs_skip_round = 0;
+ 
+-	g_bottom_freq_id = mt_gpufreq_get_dvfs_table_num() - 1;
++	g_bottom_freq_id = mt_gpufreq_get_dvfs_table_num() - 2;
+ 	gpu_bottom_freq = mt_gpufreq_get_freq_by_idx(g_bottom_freq_id);
+ 
+ 	g_cust_boost_freq_id = mt_gpufreq_get_dvfs_table_num() - 1;
+-- 
+2.53.0
+

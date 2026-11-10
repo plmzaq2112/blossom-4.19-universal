@@ -1,0 +1,44 @@
+From f26236ea084c998e400c030b29e14b0be066b400 Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 13:38:31 +0800
+Subject: [PATCH 13/22] mm: reserve ~1% RAM for page allocator and raise
+ watermark scale for low-RAM devices
+
+---
+ mm/page_alloc.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index d060f2f44..435f42c67 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -7689,6 +7689,26 @@ int __meminit init_per_zone_wmark_min(void)
+ 		pr_warn("min_free_kbytes is not updated to %d because user defined value %d is preferred\n",
+ 				new_min_free_kbytes, user_min_free_kbytes);
+ 	}
++
++	/*
++	 * Low-RAM tuning: reserve ~1% of RAM for the page allocator so kswapd
++	 * runs ahead of direct reclaim, and wake kswapd earlier (0.5% of a
++	 * zone instead of the default 0.1%).  Mathematically derived default
++	 * here is only ~7MB on a 4GB device, which is too tight.
++	 */
++	{
++		unsigned long one_percent_kb =
++			(nr_free_buffer_pages() * (PAGE_SIZE >> 10)) / 100;
++
++		if (user_min_free_kbytes < 0 &&
++		    one_percent_kb > (unsigned long)min_free_kbytes &&
++		    one_percent_kb <= 65536)
++			min_free_kbytes = (int)one_percent_kb;
++
++		if (watermark_scale_factor < 50)
++			watermark_scale_factor = 50;
++	}
++
+ 	setup_per_zone_wmarks();
+ 	refresh_zone_stat_thresholds();
+ 	setup_per_zone_lowmem_reserve();
+-- 
+2.53.0
+

@@ -1,0 +1,31 @@
+From 5ea957dc42773fb49b2bde7e6e1434a68bf39aec Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 13:21:35 +0800
+Subject: [PATCH 12/22] cpufreq: clamp min freq in hybrid (cpuhvfs) update path
+
+---
+ .../base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c        | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c
+index 602434401..ad8845460 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_hybrid.c
+@@ -282,6 +282,14 @@ int Ripi_cpu_dvfs_thread(void *data)
+ 				);
+ #endif
+ 
++				/* keep the cluster floor: hybrid rewrites min periodically */
++				if (cid == 0 && p->mt_policy->min < 800000)
++					p->mt_policy->min = 800000;
++				else if (cid == 1 && p->mt_policy->min < 600000)
++					p->mt_policy->min = 600000;
++				if (p->mt_policy->min > p->mt_policy->max)
++					p->mt_policy->min = p->mt_policy->max;
++
+ #ifdef MET_DRV
+ 				if (cid == 0) {
+ 					met_tag_oneshot(0, "sched_dvfs_max_c0",
+-- 
+2.53.0
+

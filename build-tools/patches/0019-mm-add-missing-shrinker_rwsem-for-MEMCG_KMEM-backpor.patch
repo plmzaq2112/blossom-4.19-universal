@@ -1,0 +1,24 @@
+From c2f43f663644867a206399f3087fc57e96aee10d Mon Sep 17 00:00:00 2001
+From: memcg <memcg@local>
+Date: Tue, 10 Nov 2026 15:28:20 +0800
+Subject: [PATCH 19/22] mm: add missing shrinker_rwsem for MEMCG_KMEM backport
+
+---
+ mm/vmscan.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 8dbf22276..6f3dc684d 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -188,6 +188,7 @@ unsigned long vm_total_pages;
+ static LIST_HEAD(shrinker_list);
+ static DEFINE_SPINLOCK(shrinker_lock);
+ static DEFINE_RWLOCK(shrinker_rwlock);
++static DECLARE_RWSEM(shrinker_rwsem);
+ 
+ #ifdef CONFIG_MEMCG_KMEM
+ 
+-- 
+2.53.0
+

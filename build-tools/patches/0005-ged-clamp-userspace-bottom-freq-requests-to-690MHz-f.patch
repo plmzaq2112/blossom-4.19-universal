@@ -1,0 +1,27 @@
+From 67c33e64856ba57f8da319879f3ff2c256e9786a Mon Sep 17 00:00:00 2001
+From: gpu-boost <gpu-boost@local>
+Date: Tue, 10 Nov 2026 12:23:47 +0800
+Subject: [PATCH 05/22] ged: clamp userspace bottom-freq requests to 690MHz
+ floor
+
+---
+ drivers/gpu/mediatek/ged/src/ged_dvfs.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/mediatek/ged/src/ged_dvfs.c b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+index fe29596ca..095b0b75c 100644
+--- a/drivers/gpu/mediatek/ged/src/ged_dvfs.c
++++ b/drivers/gpu/mediatek/ged/src/ged_dvfs.c
+@@ -1500,6 +1500,9 @@ static void ged_dvfs_set_bottom_gpu_freq(unsigned int ui32FreqLevel)
+ 	/* 0 => The highest frequency */
+ 	/* table_num - 1 => The lowest frequency */
+ 	s_bottom_freq_id = ui32MaxLevel - ui32FreqLevel;
++	/* never let userspace (libged) lower the floor below 690MHz */
++	if (ui32MaxLevel >= 1 && s_bottom_freq_id > ui32MaxLevel - 1)
++		s_bottom_freq_id = ui32MaxLevel - 1;
+ 	gpu_bottom_freq = mt_gpufreq_get_freq_by_idx(s_bottom_freq_id);
+ 	if (g_bottom_freq_id < s_bottom_freq_id) {
+ 		g_bottom_freq_id = s_bottom_freq_id;
+-- 
+2.53.0
+

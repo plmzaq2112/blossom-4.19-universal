@@ -106,7 +106,10 @@ mv "$outdir/kernel.gz" "$outdir/kernel"
 
 # NOTE: the DTB produced by this tree does not boot on this unit (LK crashes while
 # loading it).  The known-good DTB is the one from the 1020 stock boot image.
-REF_DTB="$HOME/kernel-oc/logs/refs/1020boot.dtb"
+REF_DTB="${REF_DTB:-$HOME/kernel-oc/logs/refs/1020boot.dtb}"
+if [ ! -f "$REF_DTB" ] && [ -f "$KERNEL_DIR/build-tools/refs/1020boot.dtb" ]; then
+  REF_DTB="$KERNEL_DIR/build-tools/refs/1020boot.dtb"
+fi
 if [ -f "$REF_DTB" ]; then
   cp "$REF_DTB" "$outdir/dtb.img"
   echo ">>> dtb from known-good reference: $REF_DTB"

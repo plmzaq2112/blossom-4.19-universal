@@ -1,0 +1,483 @@
+From 14ca943b2e59f872e2ec2b21565a3e0c3f2dea39 Mon Sep 17 00:00:00 2001
+From: release <release@local>
+Date: Tue, 10 Nov 2026 16:30:18 +0800
+Subject: [PATCH 22/22] blossom: add project README, build tools and change
+ patches
+
+---
+ .gitignore                    |   3 +
+ README.md                     |  64 +++++++++++++
+ build-tools/append_cmdline.py |  16 ++++
+ build-tools/build_o3.sh       |   3 +
+ build-tools/build_sashimi.sh  | 169 ++++++++++++++++++++++++++++++++++
+ build-tools/edit_cmdline.py   |  13 +++
+ build-tools/pack_boot.py      |  49 ++++++++++
+ build-tools/port_oc.py        |  76 +++++++++++++++
+ build-tools/run_build.sh      |   5 +
+ 9 files changed, 398 insertions(+)
+ create mode 100755 README.md
+ create mode 100755 build-tools/append_cmdline.py
+ create mode 100755 build-tools/build_o3.sh
+ create mode 100755 build-tools/build_sashimi.sh
+ create mode 100755 build-tools/edit_cmdline.py
+ create mode 100755 build-tools/pack_boot.py
+ create mode 100755 build-tools/port_oc.py
+ create mode 100755 build-tools/run_build.sh
+
+diff --git a/.gitignore b/.gitignore
+index e8d7b236a..9302f7e9b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -119,3 +119,6 @@ all.config
+ 
+ # Kdevelop4
+ *.kdev4
++
++out/
++newkernel/
+diff --git a/README.md b/README.md
+new file mode 100755
+index 000000000..e398c3b0b
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,64 @@
++# Blossom Kernel (4.19.325)
++
++Maintained Linux 4.19.325 kernel for the Xiaomi Redmi 9A family
++(`blossom` platform, MediaTek MT6762/MT6765).
++
++Devices (by codename): `dandelion`, `angelica`, `angelican`, `angelicain`,
++`cattail` (plus the `blossom` recovery codename used by some device checks).
++
++## Features
++
++- CPU overclock: big cores 2201 MHz, little cores 1700 MHz, CCI 1248 MHz
++  (2301 MHz big-core build available as an experimental variant)
++- Screen-aware minimum frequency: 800/600 MHz with the screen on,
++  400/300 MHz with the screen off
++- Input boost: 1.2 GHz / 1.0 GHz for one second after touch or key input
++- GPU: idle at 550 MHz, boost up to 850 MHz, early ramp-up at >=45% load
++- I/O scheduler: mq-deadline by default
++- Memory: MEMCG + /proc/zoneinfo, PSI, MGLRU, zram/lz4, simple_lmk
++- Memory watermarks: min_free_kbytes ~1% of RAM, watermark_scale_factor=50
++- Blossom family DT overlays: dandelion, angelica, angelican, angelicain, cattail
++- AnyKernel3 package is boot-only: kernel + base DTB, dtbo is never modified
++
++## CPU voltage
++
++- Top OPP (2201 MHz) source setting: `CPU_DVFS_VOLT0 = 116875` (1.16875 V)
++- Measured Vproc under full load: 1081250 uV (1.08125 V), adjusted by PVS/efuse
++- Other OPP voltages are unchanged from the source tree; no extra undervolt
++
++## Important: base DTB
++
++The DTB produced by this tree can crash LK on real hardware. The build and
++release packages therefore use the known-good 1020 base DTB
++(`126,985 bytes`, `sha256 333cf70ce8cf6da0dd4c3326ed7dfc4965209cce02651ad164ed749ff0211732`).
++Do not package a freshly built `mt6765.dtb` into a boot image.
++
++## Building
++
++`build-tools/` contains the exact scripts used for the release:
++
++- `build_sashimi.sh` — defconfig + full LTO build + AnyKernel3 packaging
++- `build_o3.sh` — same build with `-O3 -mcpu=cortex-a53+crc+crypto`
++- `run_build.sh` — logging wrapper
++- `pack_boot.py` — repack an Android boot v2 image with a new kernel/DTB
++- `append_cmdline.py` / `edit_cmdline.py` — boot cmdline helpers
++- `patches/` — all changes on top of the upstream sashimi branch
++
++Requirements: clang (Neutron clang 24), GNU aarch64 cross binutils,
++ccache, bc, flex, zip, dtc.
++
++## Flashing
++
++Back up `boot` and `dtbo` before flashing, then flash the AnyKernel3 zip in
++recovery (or install it with `twrp install`). The zip only writes the boot
++partition.
++
++## Credits
++
++- Base: `zyexro/sashimi_kernel_xiaomi_blossom` (`sashimi` branch)
++- CPU overclock reference: `IsHacker-kernel/android_kernel_xiaomi_blossom`
++- Blossom family overlays: `MiCode/Xiaomi_Kernel_OpenSource` (`dandelion-q-oss`)
++
++## License
++
++GPL-2.0, as inherited from the Linux kernel and the vendor tree.
+diff --git a/build-tools/append_cmdline.py b/build-tools/append_cmdline.py
+new file mode 100755
+index 000000000..5f2bfb116
+--- /dev/null
++++ b/build-tools/append_cmdline.py
+@@ -0,0 +1,16 @@
++#!/usr/bin/env python3
++"""append_cmdline.py in.img out.img "extra args" """
++import struct, pathlib, sys
++src, dst, extra = sys.argv[1], sys.argv[2], sys.argv[3]
++b = bytearray(pathlib.Path(src).read_bytes())
++if b[:8] != b"ANDROID!":
++    sys.exit("not an android boot image")
++page = struct.unpack_from("<I", b, 36)[0]
++cmd = bytes(b[64:64+512]).split(b"\0")[0]
++new = cmd + b" " + extra.encode()
++if len(new) >= 512:
++    sys.exit(f"cmdline too long: {len(new)}")
++b[64:64+512] = new + b"\0" * (512 - len(new))
++pathlib.Path(dst).write_bytes(b)
++print("cmdline:", new.decode())
++print("total", len(b), "page", page)
+diff --git a/build-tools/build_o3.sh b/build-tools/build_o3.sh
+new file mode 100755
+index 000000000..828abb056
+--- /dev/null
++++ b/build-tools/build_o3.sh
+@@ -0,0 +1,3 @@
++#!/bin/bash
++export EXTRA_KCFLAGS="-O3 -mcpu=cortex-a53+crc+crypto -fno-semantic-interposition"
++exec "$HOME/kernel-oc/tools/run_build.sh"
+diff --git a/build-tools/build_sashimi.sh b/build-tools/build_sashimi.sh
+new file mode 100755
+index 000000000..affaff7bf
+--- /dev/null
++++ b/build-tools/build_sashimi.sh
+@@ -0,0 +1,169 @@
++#!/bin/bash
++# Local (WSL) adaptation of bn (6).sh for the sashimi tree.
++# All paths live inside ~/kernel-oc; nothing outside is touched.
++set -u
++
++KERNEL_DIR="$HOME/kernel-oc/sashimi_kernel_xiaomi_blossom"
++TOOLCHAINS="$HOME/kernel-oc/toolchains"
++CLANG_DIR="$TOOLCHAINS/neutron-clang"
++anykernel="$HOME/kernel-oc/anykernel/AnyKernel3"
++CCACHE_DIR_LOCAL="$HOME/kernel-oc/ccache"
++CONFIG_FILE="blossom_defconfig"
++ARCH="arm64"
++JOBS="$(nproc --all)"
++
++cd "$KERNEL_DIR" || exit 1
++
++# --- proxy for downloads (xray on Windows host) ---
++if [ -f "$HOME/kernel-oc/proxy.sh" ]; then . "$HOME/kernel-oc/proxy.sh"; fi
++
++mkdir -p "$TOOLCHAINS" "$CCACHE_DIR_LOCAL"
++
++# --- toolchain: Neutron clang taken from the original script ---
++if [ ! -x "$CLANG_DIR/bin/clang" ]; then
++  echo ">>> fetching Neutron clang into $CLANG_DIR"
++  mkdir -p "$CLANG_DIR" && cd "$CLANG_DIR" || exit 1
++  if [ ! -x antman ]; then
++    curl -fsSL -o antman "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman" || exit 1
++    chmod +x antman
++  fi
++  ./antman -S || { echo "!! antman failed"; exit 1; }
++  cd "$KERNEL_DIR" || exit 1
++fi
++
++if [ -x "$CLANG_DIR/bin/clang" ]; then
++  export PATH="$CLANG_DIR/bin:$PATH"
++  CC_BIN="$(command -v clang)"
++else
++  echo "!! neutron clang missing, falling back to system clang"
++  CC_BIN="$(command -v clang)"
++fi
++echo ">>> using clang: $CC_BIN"
++"$CC_BIN" --version | head -2
++
++export ARCH="$ARCH"
++export KBUILD_BUILD_USER="t.me"
++export KBUILD_BUILD_HOST="AnymoreProject"
++export USE_CCACHE=1
++export CCACHE_DIR="$CCACHE_DIR_LOCAL"
++export CCACHE="$(command -v ccache)"
++
++objdir="$KERNEL_DIR/out"
++
++# --- host build strings (equivalent of the mkcompile_h sed, without dirtying the tree) ---
++export KBUILD_BUILD_USER="xc112lg_+_zyexro"
++export KBUILD_BUILD_HOST="crave.io"
++
++echo ">>> make O=out mrproper"
++make O="$objdir" mrproper >/dev/null 2>&1 || echo "!! mrproper had issues, continuing"
++mkdir -p "$objdir"
++
++echo ">>> generating $CONFIG_FILE (O=out)"
++make -s ARCH="$ARCH" O="$objdir" "$CONFIG_FILE" || { echo "!! defconfig failed"; exit 1; }
++
++echo ">>> starting compile: -j$JOBS KCFLAGS=${EXTRA_KCFLAGS:-<default>}"
++BUILD_START=$(date +%s)
++answers=$'2\ny\ny\ny\ny\ny\ny\n'
++echo "$answers" | make -j"$JOBS" \
++    O="$objdir" \
++    ARCH="arm64" \
++    SUBARCH="arm64" \
++    DTC_EXT="dtc" \
++    CLANG_TRIPLE="aarch64-linux-gnu-" \
++    CROSS_COMPILE="aarch64-linux-gnu-" \
++    CROSS_COMPILE_ARM32="arm-linux-gnueabi-" \
++    CROSS_COMPILE_COMPAT="arm-linux-gnueabi-" \
++    LD="ld.lld" \
++    AR="llvm-ar" \
++    NM="llvm-nm" \
++    STRIP="llvm-strip" \
++    OBJCOPY="llvm-objcopy" \
++    OBJDUMP="llvm-objdump" \
++    READELF="llvm-readelf" \
++    HOSTCC="clang" \
++    HOSTCXX="clang++" \
++    HOSTAR="llvm-ar" \
++    HOSTLD="ld.lld" \
++    LLVM=1 \
++    LLVM_IAS=1 \
++    KCFLAGS="${EXTRA_KCFLAGS:-}" \
++    CC="ccache clang"
++rc=$?
++BUILD_END=$(date +%s)
++echo ">>> make exited with $rc after $((BUILD_END-BUILD_START))s"
++[ $rc -ne 0 ] && exit $rc
++
++# --- outputs ---
++image="$objdir/arch/arm64/boot/Image"
++dtb_img="$objdir/arch/arm64/boot/dtb.img"
++outdir="$KERNEL_DIR/newkernel"
++mkdir -p "$outdir"
++
++[ -f "$image" ] || { echo "!! no Image produced"; exit 1; }
++cp "$image" "$outdir/kernel"
++gzip -9 -f "$outdir/kernel"
++mv "$outdir/kernel.gz" "$outdir/kernel"
++
++# NOTE: the DTB produced by this tree does not boot on this unit (LK crashes while
++# loading it).  The known-good DTB is the one from the 1020 stock boot image.
++REF_DTB="$HOME/kernel-oc/logs/refs/1020boot.dtb"
++if [ -f "$REF_DTB" ]; then
++  cp "$REF_DTB" "$outdir/dtb.img"
++  echo ">>> dtb from known-good reference: $REF_DTB"
++else
++  echo "!! WARNING: $REF_DTB missing, falling back to freshly built DTB (may not boot)"
++  for cand in "$dtb_img" "$objdir/arch/arm64/boot/mtk.dtb" \
++              "$objdir/arch/arm64/boot/dts/mediatek/mt6765.dtb"; do
++    if [ -f "$cand" ]; then cp "$cand" "$outdir/dtb.img"; echo ">>> dtb from $cand"; break; fi
++  done
++fi
++ls -lh "$outdir"
++
++# --- AnyKernel3 zip ---
++if [ ! -f "$anykernel/tools/ak3-core.sh" ]; then
++  mkdir -p "$(dirname "$anykernel")"
++  git -c http.proxy="${http_proxy:-}" clone --depth=1 https://github.com/osm0sis/AnyKernel3 "$anykernel" || exit 1
++fi
++cd "$anykernel" || exit 1
++rm -f Image Image.gz Image.gz-dtb dtb *.zip
++gzip -9 -c "$image" > Image.gz
++[ -f "$outdir/dtb.img" ] && cp "$outdir/dtb.img" dtb
++
++cat > anykernel.sh <<'AKEOF'
++### AnyKernel3 Ramdisk Mod Script
++properties() { '
++kernel.string=Blossom kernel
++do.devicecheck=1
++do.modules=0
++do.systemless=0
++do.cleanup=1
++do.cleanuponabort=0
++device.name1=blossom
++device.name2=dandelion
++device.name3=angelica
++device.name4=angelican
++device.name5=angelicain
++device.name6=cattail
++supported.versions=
++supported.patchlevels=
++supported.vendorpatchlevels=
++'; }
++
++BLOCK=/dev/block/by-name/boot;
++IS_SLOT_DEVICE=0;
++RAMDISK_COMPRESSION=auto;
++PATCH_VBMETA_FLAG=auto;
++
++. tools/ak3-core.sh;
++
++# (backup left to the user: back up boot + dtbo before flashing)
++split_boot;
++flash_boot;
++AKEOF
++
++ZIPNAME="Blossom-Kernel-$(date +%Y%m%d-%H%M).zip"
++zip -r9 "$ZIPNAME" . -x ".git*" "README*" "*.md" "*.zip" >/dev/null || exit 1
++mkdir -p "$KERNEL_DIR/newkernel"
++cp "$ZIPNAME" "$KERNEL_DIR/newkernel/"
++echo ">>> flashable zip: $KERNEL_DIR/newkernel/$ZIPNAME"
++cd "$KERNEL_DIR" || exit 1
+diff --git a/build-tools/edit_cmdline.py b/build-tools/edit_cmdline.py
+new file mode 100755
+index 000000000..163c04796
+--- /dev/null
++++ b/build-tools/edit_cmdline.py
+@@ -0,0 +1,13 @@
++#!/usr/bin/env python3
++"""edit_cmdline.py in.img out.img remove_prefix"""
++import struct, pathlib, sys
++src, dst, prefix = sys.argv[1], sys.argv[2], sys.argv[3]
++b = bytearray(pathlib.Path(src).read_bytes())
++if b[:8] != b"ANDROID!":
++    sys.exit("not boot image")
++cmd = bytes(b[64:64+512]).split(b"\0")[0].decode()
++parts = [p for p in cmd.split() if not p.startswith(prefix)]
++new = " ".join(parts).encode()
++b[64:64+512] = new + b"\0" * (512 - len(new))
++pathlib.Path(dst).write_bytes(b)
++print("cmdline:", new.decode())
+diff --git a/build-tools/pack_boot.py b/build-tools/pack_boot.py
+new file mode 100755
+index 000000000..0686e814d
+--- /dev/null
++++ b/build-tools/pack_boot.py
+@@ -0,0 +1,49 @@
++#!/usr/bin/env python3
++"""pack_boot.py BASE.img KERNEL.gz DTB OUT.img  — keep ramdisk/cmdline/AVB footer."""
++import struct, pathlib, hashlib, sys
++
++base_p, kernel_p, dtb_p, out_p = [pathlib.Path(x) for x in sys.argv[1:5]]
++base = base_p.read_bytes()[:67108864]
++kernel = kernel_p.read_bytes()
++dtb = dtb_p.read_bytes()
++
++ksize, kaddr, rsize, raddr, ssize, saddr, tags, page, hver = struct.unpack_from("<9I", base, 8)
++rec_size, rec_off = struct.unpack_from("<IQ", base, 1632)
++hsize, dsize = struct.unpack_from("<II", base, 1644)
++assert page == 2048 and hver == 2, (page, hver)
++
++def al(x): return (x + page - 1)//page*page
++old_roff = al(page + ksize)
++old_soff = al(old_roff + rsize)
++old_recoff = al(old_soff + ssize)
++old_doff = al(old_recoff + rec_size)
++ramdisk = base[old_roff:old_roff+rsize]
++second = base[old_soff:old_soff+ssize]
++rec = base[old_recoff:old_recoff+rec_size]
++
++koff = page
++roff = al(koff + len(kernel))
++soff = al(roff + len(ramdisk))
++recoff = al(soff + len(second))
++doff = al(recoff + len(rec))
++total = 67108864
++avb = base[total-64:total]
++assert avb[:4] == b"AVBf"
++
++img = bytearray(total)
++hdr = bytearray(base[:page])
++struct.pack_into("<I", hdr, 8, len(kernel))
++struct.pack_into("<I", hdr, 16, len(ramdisk))
++struct.pack_into("<I", hdr, 24, len(second))
++struct.pack_into("<I", hdr, 1648, len(dtb))
++img[:page] = hdr
++img[koff:koff+len(kernel)] = kernel
++img[roff:roff+len(ramdisk)] = ramdisk
++if second: img[soff:soff+len(second)] = second
++if rec: img[recoff:recoff+len(rec)] = rec
++img[doff:doff+len(dtb)] = dtb
++img[total-64:total] = avb
++out_p.write_bytes(img)
++print("wrote", out_p, len(img))
++print("kernel", len(kernel), hashlib.sha256(kernel).hexdigest()[:16])
++print("dtb   ", len(dtb), hashlib.sha256(dtb).hexdigest()[:16], "at", doff)
+diff --git a/build-tools/port_oc.py b/build-tools/port_oc.py
+new file mode 100755
+index 000000000..b6192ebe2
+--- /dev/null
++++ b/build-tools/port_oc.py
+@@ -0,0 +1,76 @@
++#!/usr/bin/env python3
++"""Port IsHacker-kernel's CPU overclock to the sashimi tree.
++
++IsHacker final state (branch master @0d7457d08):
++  C62/C62LY  L  2101 -> 2201 MHz @ Vproc 120 (1168750 uV in opp table)
++             LL 1500 -> 1700 MHz @ Vproc 120
++             CCI 1048 -> 1248 MHz @ Vproc 120
++  mt6765.dts: cluster0 2401 -> 2501 MHz, cluster1 1800 -> 2000 MHz, CCI 1051 -> 1251 MHz
++GPU OC is deliberately NOT touched: sashimi already runs 850/690/550 MHz
++(IsHacker only does 680/520/416).
++"""
++import sys, pathlib
++
++root = pathlib.Path.home() / "kernel-oc" / "sashimi_kernel_xiaomi_blossom"
++changed = []
++
++def sub_any(path, olds, new, count=1):
++    p = root / path
++    s = p.read_text()
++    for old in olds:
++        if s.count(old) >= count:
++            p.write_text(s.replace(old, new, count))
++            changed.append((path, old, new))
++            return
++    sys.exit(f"FAIL {path}: none of {olds!r} found")
++
++def sub_in_block(path, start_marker, end_marker, old, new):
++    p = root / path
++    s = p.read_text()
++    i = s.index(start_marker)
++    j = s.index(end_marker, i)
++    block = s[i:j]
++    if block.count(old) < 1:
++        sys.exit(f"FAIL {path} [{start_marker}]: {old!r} not found")
++    p.write_text(s[:i] + block.replace(old, new, 1) + s[j:])
++    changed.append((path + " [" + start_marker + "]", old, new))
++
++OPP = "drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_table.h"
++PV  = "drivers/misc/mediatek/base/power/cpufreq_v1/src/mach/mt6765/mtk_cpufreq_opp_pv_table.h"
++DTS = "arch/arm64/boot/dts/mediatek/mt6765.dts"
++
++# 1. static tables used by the v1 cpufreq driver
++for suffix in ("C62", "C62LY"):
++    sub_any(OPP, [f"#define CPU_DVFS_FREQ0_L_{suffix}    2101000"], f"#define CPU_DVFS_FREQ0_L_{suffix}    2201000")
++    sub_any(OPP, [f"#define CPU_DVFS_FREQ0_LL_{suffix}    1500000"], f"#define CPU_DVFS_FREQ0_LL_{suffix}    1700000")
++    sub_any(OPP, [f"#define CPU_DVFS_FREQ0_CCI_{suffix}    1048000"], f"#define CPU_DVFS_FREQ0_CCI_{suffix}    1248000")
++    sub_any(OPP, [f"#define CPU_DVFS_VOLT0_VPROC_L_{suffix}    106875",
++                  f"#define CPU_DVFS_VOLT0_VPROC_L_{suffix}    111875"],
++            f"#define CPU_DVFS_VOLT0_VPROC_L_{suffix}    116875")
++    sub_any(OPP, [f"#define CPU_DVFS_VOLT0_VPROC_LL_{suffix}    102500",
++                  f"#define CPU_DVFS_VOLT0_VPROC_LL_{suffix}    111875"],
++            f"#define CPU_DVFS_VOLT0_VPROC_LL_{suffix}    116875")
++    sub_any(OPP, [f"#define CPU_DVFS_VOLT0_VPROC_CCI_{suffix}    106875",
++                  f"#define CPU_DVFS_VOLT0_VPROC_CCI_{suffix}    111875"],
++            f"#define CPU_DVFS_VOLT0_VPROC_CCI_{suffix}    116875")
++
++# 2. PV / hybrid tables
++for start, end in (("static unsigned int c62Tbl", "static unsigned int c62lyTbl"),
++                   ("static unsigned int c62lyTbl", "unsigned int *xrecordTbl")):
++    sub_in_block(PV, start, end, "{ 2101, 96, 1, 1 }", "{ 2201, 120, 1, 1 }")
++    sub_in_block(PV, start, end, "{ 1500, 96, 2, 1 }", "{ 1700, 120, 2, 1 }")
++    sub_in_block(PV, start, end, "{ 1048, 96, 2, 1 }", "{ 1248, 120, 2, 1 }")
++
++# 3. devicetree OPP tables
++sub_any(DTS, ["\t\t\topp-hz = /bits/ 64 <2401000000>;\n\t\t\topp-microvolt = <1068750>;"],
++        "\t\t\topp-hz = /bits/ 64 <2501000000>;\n\t\t\topp-microvolt = <1168750>;")
++sub_any(DTS, ["\t\t\topp-hz = /bits/ 64 <1800000000>;\n\t\t\topp-microvolt = <1025000>;"],
++        "\t\t\topp-hz = /bits/ 64 <2000000000>;\n\t\t\topp-microvolt = <1168750>;")
++sub_any(DTS, ["\t\t\topp-hz = /bits/ 64 <1051000000>;\n\t\t\topp-microvolt = <1068750>;"],
++        "\t\t\topp-hz = /bits/ 64 <1251000000>;\n\t\t\topp-microvolt = <1168750>;")
++sub_any(DTS, ["clock-frequency = <2401000000>;"], "clock-frequency = <2501000000>;", 4)
++sub_any(DTS, ["clock-frequency = <1800000000>;"], "clock-frequency = <2000000000>;", 4)
++
++print(f"{len(changed)} replacements applied:")
++for path, old, new in changed:
++    print("  ", path.split("/")[-1], "|", old.strip(), "->", new.strip())
+diff --git a/build-tools/run_build.sh b/build-tools/run_build.sh
+new file mode 100755
+index 000000000..cf45140a3
+--- /dev/null
++++ b/build-tools/run_build.sh
+@@ -0,0 +1,5 @@
++#!/bin/bash
++LOG="$HOME/kernel-oc/build-$(date +%Y%m%d-%H%M).log"
++echo "$LOG" > "$HOME/kernel-oc/build-latest.txt"
++"$HOME/kernel-oc/tools/build_sashimi.sh" > "$LOG" 2>&1
++echo "EXIT=$?" >> "$LOG"
+-- 
+2.53.0
+

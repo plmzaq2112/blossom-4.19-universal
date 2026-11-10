@@ -1,0 +1,138 @@
+From 42bbafcff522144b6e1232a3957a9d677107094e Mon Sep 17 00:00:00 2001
+From: perf <perf@local>
+Date: Tue, 10 Nov 2026 14:19:36 +0800
+Subject: [PATCH 16/22] cpufreq: 1s input boost (1.2/1.0GHz); config: default
+ mq-deadline io scheduler
+
+---
+ arch/arm64/configs/blossom_defconfig          |  2 +
+ .../power/cpufreq_v1/src/mtk_cpufreq_main.c   | 86 +++++++++++++++++++
+ 2 files changed, 88 insertions(+)
+
+diff --git a/arch/arm64/configs/blossom_defconfig b/arch/arm64/configs/blossom_defconfig
+index 1a38d82d7..0dac418b3 100644
+--- a/arch/arm64/configs/blossom_defconfig
++++ b/arch/arm64/configs/blossom_defconfig
+@@ -456,3 +456,5 @@ CONFIG_PSTORE_RAM=y
+ CONFIG_PANIC_TIMEOUT=1
+ # CONFIG_TRACING_EVENTS_GPIO is not set
+ # CONFIG_RUNTIME_TESTING_MENU is not set
++
++# CONFIG_BFQ_DEFAULT is not set
+diff --git a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+index 81db57ee6..7b1119804 100644
+--- a/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
++++ b/drivers/misc/mediatek/base/power/cpufreq_v1/src/mtk_cpufreq_main.c
+@@ -8,6 +8,7 @@
+ #include <linux/energy_model.h>
+ #include <linux/fb.h>
+ #include <linux/workqueue.h>
++#include <linux/input.h>
+ //#include <mt-plat/met_drv.h>
+ /* project includes */
+ #include "../../include/mtk_ppm_api.h"
+@@ -870,9 +871,21 @@ static enum mt_cpu_dvfs_id _get_cpu_dvfs_id(unsigned int cpu_id);
+ 
+ /* ---- screen-state aware minimum frequency floor ---- */
+ bool mt_cpufreq_screen_on = true;
++static unsigned long mt_cpufreq_boost_until;
++
++static bool mt_cpufreq_boost_active(void)
++{
++	return time_before(jiffies, mt_cpufreq_boost_until);
++}
+ 
+ unsigned int mt_cpufreq_min_floor(enum mt_cpu_dvfs_id id)
+ {
++	if (mt_cpufreq_boost_active()) {
++		if (id == MT_CPU_DVFS_L)
++			return 1200000;
++		if (id == MT_CPU_DVFS_LL)
++			return 1000000;
++	}
+ 	if (id == MT_CPU_DVFS_L)
+ 		return mt_cpufreq_screen_on ? 800000 : 400000;
+ 	if (id == MT_CPU_DVFS_LL)
+@@ -912,6 +925,79 @@ static int __init mt_cpufreq_screen_notifier_init(void)
+ }
+ late_initcall(mt_cpufreq_screen_notifier_init);
+ 
++/* ---- short input boost: 1s at 1.2GHz/1.0GHz after touch/key ---- */
++static void mt_cpufreq_boost_work(struct work_struct *work)
++{
++	cpufreq_update_policy(0);
++	cpufreq_update_policy(4);
++}
++static DECLARE_DELAYED_WORK(mt_cpufreq_boost_workq, mt_cpufreq_boost_work);
++
++static void mt_cpufreq_input_event(struct input_handle *handle,
++				   unsigned int type, unsigned int code, int value)
++{
++	if (type != EV_ABS && type != EV_KEY)
++		return;
++
++	mt_cpufreq_boost_until = jiffies + msecs_to_jiffies(1000);
++	mod_delayed_work(system_wq, &mt_cpufreq_boost_workq,
++			 msecs_to_jiffies(1000));
++}
++
++static int mt_cpufreq_input_connect(struct input_handler *handler,
++				    struct input_dev *dev,
++				    const struct input_device_id *id)
++{
++	struct input_handle *handle;
++	int error;
++
++	handle = kzalloc(sizeof(*handle), GFP_KERNEL);
++	if (!handle)
++		return -ENOMEM;
++	handle->dev = dev;
++	handle->handler = handler;
++	handle->name = "mt_cpufreq_boost";
++
++	error = input_register_handle(handle);
++	if (error) {
++		kfree(handle);
++		return error;
++	}
++	error = input_open_device(handle);
++	if (error) {
++		input_unregister_handle(handle);
++		kfree(handle);
++		return error;
++	}
++	return 0;
++}
++
++static void mt_cpufreq_input_disconnect(struct input_handle *handle)
++{
++	input_close_device(handle);
++	input_unregister_handle(handle);
++	kfree(handle);
++}
++
++static const struct input_device_id mt_cpufreq_input_ids[] = {
++	{ .flags = INPUT_DEVICE_ID_MATCH_EVBIT, .evbit = { BIT_MASK(EV_ABS) } },
++	{ },
++};
++
++static struct input_handler mt_cpufreq_input_handler = {
++	.event = mt_cpufreq_input_event,
++	.connect = mt_cpufreq_input_connect,
++	.disconnect = mt_cpufreq_input_disconnect,
++	.name = "mt_cpufreq_boost",
++	.id_table = mt_cpufreq_input_ids,
++};
++
++static int __init mt_cpufreq_input_boost_init(void)
++{
++	return input_register_handler(&mt_cpufreq_input_handler);
++}
++late_initcall(mt_cpufreq_input_boost_init);
++
+ void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_idx,
+ 	enum mt_cpu_dvfs_action_id action, void *data)
+ {
+-- 
+2.53.0
+
