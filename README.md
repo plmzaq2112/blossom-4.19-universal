@@ -37,7 +37,8 @@ Do not package a freshly built `mt6765.dtb` into a boot image.
 
 ## Building
 
-`build-tools/` contains the exact scripts used for the release:
+`build-tools/` contains the release build scripts and the helper scripts
+used during development:
 
 - `build_sashimi.sh` — defconfig + full LTO build + AnyKernel3 packaging
 - `build_o3.sh` — same build with `-O3 -mcpu=cortex-a53+crc+crypto`
